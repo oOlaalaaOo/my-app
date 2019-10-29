@@ -1,20 +1,12 @@
 const path = require('path')
 const withCSS = require('@zeit/next-css')
-const nextRuntimeDotenv = require('next-runtime-dotenv')
 const withPlugins = require('next-compose-plugins')
 const withOffline = require('next-offline')
 
-const withConfig = nextRuntimeDotenv({
-  path: '.env',
-  public: [
-    'API_URL'
-  ]
-})
+const isDev = process.env.NODE_ENV !== 'production'
 
-const nextConfig = {
-  transformManifest: manifest => ['/'].concat(manifest), // add the homepage to the cache
-  // Trying to set NODE_ENV=production when running yarn dev causes a build-time error so we
-  // turn on the SW in dev mode so that we can actually test it
+const nextOfflineConfig = {
+  transformManifest: manifest => ['/'].concat(manifest),
   generateInDevMode: true,
   workboxOpts: {
     swDest: 'static/service-worker.js',
@@ -27,7 +19,7 @@ const nextConfig = {
           networkTimeoutSeconds: 15,
           expiration: {
             maxEntries: 150,
-            maxAgeSeconds: 30 * 24 * 60 * 60, // 1 month
+            maxAgeSeconds: 30 * 24 * 60 * 60,
           },
           cacheableResponse: {
             statuses: [0, 200],
@@ -38,11 +30,23 @@ const nextConfig = {
   }
 }
 
-module.exports = withConfig(
-  withPlugins([
-    [
-      withCSS,
-      withOffline
-    ],
+const nextConfig = {
+  webpack(config, options) {
+    config.resolve.alias['~'] = path.join(__dirname, '/')
+    config.node = {
+      fs: "empty"
+    }
+    return config
+  }
+}
+
+if (!isDev) {
+  module.exports = withPlugins([
+    [withCSS, withOffline(nextOfflineConfig)]
   ], nextConfig)
-)
+} else {
+  module.exports = withPlugins([
+    [withCSS]
+  ], nextConfig)
+}
+
